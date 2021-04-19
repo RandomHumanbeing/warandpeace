@@ -49,7 +49,7 @@ def generate(range=150):
 global countries
 countries = open("countries.txt", "r").read().split("\n")
 
-token = "your trash"
+token = "ODMxOTkwNDk0NDg5MzQ2MDY5.YHdRhw.MGoTF2HwlM7xdHYQi9Ndre7FRVo"
 
 prefix = "~"
 wap = discord.client
@@ -307,7 +307,35 @@ class DatabaseFunctions:
     def check_product_price(product):
         conn,c = DatabaseFunctions.connect()
         for term in c.execute("SELECT * FROM ProductPrice").fetchall():
-            if term[0] == product: return product[1]
+            if term[0] == product: return term[1]
+
+    def give_product(country,product,amount):
+        products={'black_leaf_40' : 1,
+        'cyanide' : 2,
+        'death_stalker_sting' : 3,
+        'arsenic' : 4,
+        'polonium' : 5}
+        conn,c = DatabaseFunctions.connect()
+        for term in c.execute("SELECT * FROM Inventories").fetchall():
+            if term[0] == country:
+                amount=int(amount)
+                amount+=int(term[products[product]])
+
+        c.execute(f"UPDATE Inventories SET {product} = ? WHERE country = ?", (str(amount), country,))
+        conn.commit()
+        conn.close()
+
+    def get_inventory(country):
+        conn,c = DatabaseFunctions.connect()
+        inventory = {}
+        for product in c.execute("SELECT * FROM Inventories").fetchall():
+            if product[0] == country:
+                inventory["black_leaf_40"] = product[1]
+                inventory["cyanide"] = product[2]
+                inventory["death_stalker_sting"] = product[3]
+                inventory["arsenic"] = product[4]
+                inventory["polonium"] = product[5]
+        return inventory
 
 
 
@@ -395,10 +423,14 @@ async def addbudget(ctx, amount:str):
     for role in ctx.author.roles:
         if str(role) in countries:
             country = str(role)
-    DatabaseFunctions.add_budget(country, int(amount))
-    DatabaseFunctions.remove_money(country, int(amount))
-    budget =  ('{:,}'.format(int(DatabaseFunctions.budget(str(country)))))
-    await ctx.channel.send("New Budget: " + budget)
+    if "-" not in str(amount):
+        if DatabaseFunctions.money(country)>=amount:
+            DatabaseFunctions.add_budget(country, int(amount))
+            DatabaseFunctions.remove_money(country, int(amount))
+            budget =  ('{:,}'.format(int(DatabaseFunctions.budget(str(country)))))
+            await ctx.channel.send("New Budget: " + budget)
+        else:
+            await ctx.channel.send("your trash noob")
 
 @wap.command()
 async def removebudget(ctx, amount:str):
@@ -447,6 +479,31 @@ async def enmity(ctx, countryenmity:str):
 @wap.command()
 async def shop(ctx):
     await ctx.channel.send(Messages.shop)
+
+@wap.command()
+async def buy(ctx, product:str, amount:str):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+    price = int(DatabaseFunctions.check_product_price(product))*int(amount)
+    if int(DatabaseFunctions.money(country))>=price:
+        DatabaseFunctions.remove_money(country, str(price))
+        DatabaseFunctions.give_product(country,product,amount)
+        await ctx.channel.send(f"Bought {str(amount)} {str(product)} for $" + str(price))
+
+@wap.command()
+async def inventory(ctx):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+    inventory = str(DatabaseFunctions.get_inventory(country)).replace("{", "").replace("}", "").replace(",", "\n").replace("'", "")
+    await ctx.channel.send("```" + str(inventory) + "```")
+
+
+
+
 
 
 
