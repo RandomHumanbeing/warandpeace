@@ -49,7 +49,7 @@ def generate(range=150):
 global countries
 countries = open("countries.txt", "r").read().split("\n")
 
-token = "ODMxOTkwNDk0NDg5MzQ2MDY5.YHdRhw.MGoTF2HwlM7xdHYQi9Ndre7FRVo"
+token = "a"
 
 prefix = "~"
 wap = discord.client
