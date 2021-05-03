@@ -5,6 +5,9 @@ from discord.ext import (
     tasks
 )
 import sqlite3
+import threading
+import time
+from datetime import datetime
 
 ##################################################################################################################################################################
 ##################################################################################################################################################################
@@ -21,7 +24,7 @@ def generate(range=150):
     def parse_op(num1, num2, op):
         if op == "/": return eval("num1/num2")
         if op == "m": return eval("num1%num2")
-        if op == "*": return eval("num1*num2")
+        if op == "*": return eval("num1*nummoney+=round(population/2400)2")
         if op == "-": return eval("num1-num2")
         return False
 
@@ -49,7 +52,7 @@ def generate(range=150):
 global countries
 countries = open("countries.txt", "r").read().split("\n")
 
-token = "a"
+token = ""
 
 prefix = "~"
 wap = discord.client
@@ -63,15 +66,29 @@ Misc:
 [help]: Displays this message.
 [budget]: Shows your countries budget.
 [wap]: https://www.youtube.com/watch?v=hsm4poTWjMs
+[claim]: Claims the money from your population. (1 per day)
 
 Wars:
 [warstat]: Shows war statuses for countries.
 [declare]: Starts a war with another country.
 [assassinate]: Attempts an assassination on a country.
+[peace]: Stops a war.
 
 Allies:
 [allystat]: Shows ally statuses for countries.
 [ally]: Allies a country.
+[enmity]: Removes ally from another country.
+
+Items:
+[shop]: Shows the shop for items that can be used in assassinations.
+[buy]: Buys a product from the shop.
+[inventory]: Shows the products that your country owns.
+
+Economy:
+[budget]: Shows your country's budget.
+[addbudget]: Adds money to your budget taken from your money.
+[removebudget]: Takes money away from your budget and adds it to your money.
+[money]: Shows the money that you have that can be used for buying things.
 ```"""
 
     finish = "Operation Completed."
@@ -80,8 +97,43 @@ Allies:
 [Black Leaf 40] : $400
 [Cyanide] : $300
 [Arsenic] : $700
-[Deather Stalker Sting] : $1,000
+[Death Stalker Sting] : $1,000
 [Polonium] : $10,000```"""
+
+    store = """```ini
+[Food] : $40
+[Shelter] : $5,000
+[Clothing] : $24
+[Cars] : $18,000
+[Medicine] : $12
+```"""
+
+    production = """```ini
+[Food]:
+    Time       : 0.3 seconds/10,000 food
+    Price      : $32
+    Sell Price : $40
+
+[Shelter]:
+    Time       : 0.3 seconds/1,000
+    Price      : $4000
+    Sell Price : $5000
+
+[Clothing]:
+    Time       : 0.3 seconds/50,000
+    Price      : $20
+    Sell Price : $24
+
+[Cars]:
+    Time       : 0.3 seconds/5
+    Price      : $15,000
+    Sell Price : $18,000
+
+[Medicine]:
+    Time       : 0.3 seconds/2,000
+    Price      : $10
+    Sell Price : $12
+```"""
 
 ##################################################################################################################################################################
 ##################################################################################################################################################################
@@ -190,7 +242,8 @@ class DatabaseFunctions:
                     return term[1]
             conn.close()
 
-        chance = int(grab_budget(countryassassinate))/int(round(generate()))
+        num = round(generate())*round(random.randint(5000,100000))*round(generate())**random.randint(1,5)
+        chance = int(grab_budget(countryassassinate)+grab_budget(country))/num
         price = int("1" + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)))
         if chance <= 100:
             price = int("175" + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)))
@@ -199,10 +252,10 @@ class DatabaseFunctions:
         if chance <= 10:
             price = int("75" + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)) + str(random.randint(0,9)))
         num = random.uniform(1,chance)
-        if int(round(num)) == 2:
+        if int(round(num)) == 0:
             newbudget = str(int(grab_budget(country))+price)
             conn,c = DatabaseFunctions.connect()
-            c.execute("UPDATE AgencyBudgets SET budget = ? WHERE country=?", (newbudget, country,))
+            c.execute("UPDATE AgencyBudgets SET budget = ? WHERE country=?", (str(int(newbudget)*10), country,))
             conn.commit()
             conn.close()
             number = ('{:,}'.format(price))
@@ -337,6 +390,366 @@ class DatabaseFunctions:
                 inventory["polonium"] = product[5]
         return inventory
 
+    def population(country):
+        conn,c = DatabaseFunctions.connect()
+        return str(list(c.execute("SELECT * FROM Population WHERE country = ?", (country,)).fetchall()[0])[1])
+        conn.close()
+
+    def food(country):
+        conn,c = DatabaseFunctions.connect()
+        return str(list(c.execute("SELECT * FROM Needs WHERE country = ?", (country,)).fetchall()[0])[1])
+        conn.close()
+
+    def shelter(country):
+        conn,c = DatabaseFunctions.connect()
+        return str(list(c.execute("SELECT * FROM Needs WHERE country = ?", (country,)).fetchall()[0])[2])
+        conn.close()
+
+    def increase_population(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.population(country)
+        new = int(current)+int(amount)
+        c.execute("UPDATE Population SET population = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def decrease_population(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.population(country)
+        new = int(current)-int(amount)
+        c.execute("UPDATE Population SET population = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def decrease_food(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.food(country)
+        new = int(current)-int(amount)
+        c.execute("UPDATE Needs SET food = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def increase_food(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.food(country)
+        new = int(current)+int(amount)
+        c.execute("UPDATE Needs SET food = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def decrease_shelter(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.shelter(country)
+        new = int(current)-int(amount)
+        c.execute("UPDATE Needs SET shelter = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def increase_shelter(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.shelter(country)
+        new = int(current)+int(amount)
+        c.execute("UPDATE Needs SET shelter = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def increase_medicine(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.medicine(country)
+        new = int(current)+int(amount)
+        c.execute("UPDATE Needs SET medicine = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def decrease_medicine(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.medicine(country)
+        new = int(current)-int(amount)
+        c.execute("UPDATE Needs SET medicine = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def increase_clothing(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.clothing(country)
+        new = int(current)+int(amount)
+        c.execute("UPDATE Needs SET clothing = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def decrease_clothing(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.clothing(country)
+        new = int(current)-int(amount)
+        c.execute("UPDATE Needs SET clothing = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def increase_cars(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.clothing(country)
+        new = int(current)+int(amount)
+        c.execute("UPDATE Needs SET cars = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def decrease_cars(country, amount):
+        conn,c = DatabaseFunctions.connect()
+        current = DatabaseFunctions.cars(country)
+        new = int(current)-int(amount)
+        c.execute("UPDATE Needs SET cars = ? WHERE country=?", (int(new), country,))
+        conn.commit()
+        conn.close()
+
+    def food_threshold(country):
+        conn,c = DatabaseFunctions.connect()
+        threshold =  str(
+list(
+c.execute("SELECT * FROM Thresholds WHERE country = ?", (country,)  ).fetchall()[0]
+)[1])
+        conn.close()
+        return threshold
+
+    def shelter_threshold(country):
+                conn,c = DatabaseFunctions.connect()
+                threshold =  str(
+        list(
+        c.execute("SELECT * FROM Thresholds WHERE country = ?", (country,)  ).fetchall()[0]
+        )[2])
+                conn.close()
+                return threshold
+
+
+    def set_threshold(country, amount, threshold = "f"):
+        conn,c = DatabaseFunctions.connect()
+        if threshold == "f":
+            c.execute("UPDATE Thresholds SET food = ? WHERE country=?", (int(amount), country,))
+        if threshold == "s":
+            c.execute("UPDATE Thresholds SET shelter = ? WHERE country=?", (int(amount), country,))
+        conn.commit()
+        conn.close()
+
+    def clothing(country):
+        conn,c = DatabaseFunctions.connect()
+        return_ = str(
+list(
+c.execute("SELECT * FROM Needs WHERE country = ?", (country,)  ).fetchall()[0]
+)[3])
+        conn.close()
+        return return_
+
+    def cars(country):
+        conn,c = DatabaseFunctions.connect()
+        return_ = str(
+list(
+c.execute("SELECT * FROM Needs WHERE country = ?", (country,)  ).fetchall()[0]
+)[4])
+        conn.close()
+        return return_
+
+    def medicine(country):
+        conn,c = DatabaseFunctions.connect()
+        return_ = str(
+list(
+c.execute("SELECT * FROM Needs WHERE country = ?", (country,)  ).fetchall()[0]
+)[5])
+        conn.close()
+        return return_
+
+    def start_production(country, item, amount):
+        conn,c = DatabaseFunctions.connect()
+        if item == "food":
+            amount = int(DatabaseFunctions.get_production_food(country)) + int(amount)
+            c.execute("UPDATE Production SET food = ? WHERE country = ?", (amount,country,))
+        if item == "shelter":
+            amount = int(DatabaseFunctions.get_production_shelter(country)) + int(amount)
+            c.execute("UPDATE Production SET shelter = ? WHERE country = ?", (amount,country,))
+        if item == "clothing":
+            amount = int(DatabaseFunctions.get_production_clothing(country)) + int(amount)
+            c.execute("UPDATE Production SET clothing = ? WHERE country = ?", (amount,country,))
+        if item == "cars":
+            amount = int(DatabaseFunctions.get_production_cars(country)) + int(amount)
+            c.execute("UPDATE Production SET cars = ? WHERE country = ?", (country,amount,))
+        if item == "medicine":
+            amount = int(DatabaseFunctions.get_production_medicine(country)) + int(amount)
+            c.execute("UPDATE Production SET medicine = ? WHERE country = ?", (amount,country,))
+        conn.commit()
+        conn.close()
+
+    def get_production_food(country):
+        conn,c = DatabaseFunctions.connect()
+        return_ = str(
+list(
+c.execute("SELECT * FROM Production WHERE country = ?", (country,)  ).fetchall()[0]
+)[1])
+        conn.close()
+        return return_
+
+    def get_production_shelter(country):
+        conn,c = DatabaseFunctions.connect()
+        return_ = str(
+list(
+c.execute("SELECT * FROM Production WHERE country = ?", (country,)  ).fetchall()[0]
+)[2])
+        conn.close()
+        return return_
+
+    def get_production_clothing(country):
+        conn,c = DatabaseFunctions.connect()
+        return_ = str(
+list(
+c.execute("SELECT * FROM Production WHERE country = ?", (country,)  ).fetchall()[0]
+)[3])
+        conn.close()
+        return return_
+
+    def get_production_cars(country):
+        conn,c = DatabaseFunctions.connect()
+        return_ = str(
+list(
+c.execute("SELECT * FROM Production WHERE country = ?", (country,)  ).fetchall()[0]
+)[4])
+        conn.close()
+        return return_
+
+    def get_production_medicine(country):
+        conn,c = DatabaseFunctions.connect()
+        return_ = str(
+list(
+c.execute("SELECT * FROM Production WHERE country = ?", (country,)  ).fetchall()[0]
+)[5])
+        conn.close()
+        return return_
+
+
+
+    def start_producing_needs(country):
+        rates = {"food": "10000", "shelter": "1000", "clothing": "50000", "cars": "5", "medicine": "2000"}
+        prices = {"food": "32", "shelter": "4000", "clothing": "20", "cars": "15000", "medicine": "10"}
+        while True:
+            food = DatabaseFunctions.get_production_food(country)
+            shelter = DatabaseFunctions.get_production_shelter(country)
+            clothing = DatabaseFunctions.get_production_clothing(country)
+            cars = DatabaseFunctions.get_production_cars(country)
+            medicine = DatabaseFunctions.get_production_medicine(country)
+
+            if int(food)>=int(rates["food"]):
+                conn,c = DatabaseFunctions.connect()
+                DatabaseFunctions.increase_food(country, rates["food"])
+                food = DatabaseFunctions.get_production_food(country)
+                c.execute("UPDATE Production SET food = ? WHERE country = ?", (str(int(food)-int(rates["food"])),country,))
+                conn.commit()
+                conn.close()
+
+            if int(shelter)>=int(rates["shelter"]):
+                conn,c = DatabaseFunctions.connect()
+                DatabaseFunctions.increase_shelter(country, rates["shelter"])
+                shelter = DatabaseFunctions.get_production_shelter(country)
+                c.execute("UPDATE Production SET shelter = ? WHERE country = ?", (str(int(shelter)-int(rates["shelter"])),country,))
+                conn.commit()
+                conn.close()
+
+            if int(clothing)>=int(rates["clothing"]):
+                conn,c = DatabaseFunctions.connect()
+                DatabaseFunctions.increase_clothing(country, rates["clothing"])
+                clothing = DatabaseFunctions.get_production_clothing(country)
+                c.execute("UPDATE Production SET clothing = ? WHERE country = ?", (str(int(clothing)-int(rates["clothing"])),country,))
+                conn.commit()
+                conn.close()
+
+            if True==False:
+                conn,c = DatabaseFunctions.connect()
+                DatabaseFunctions.increase_cars(country, rates["cars"])
+                clothing = DatabaseFunctions.get_production_cars(country)
+                c.execute("UPDATE Production SET cars = ? WHERE country = ?", (str(int(cars)-int(rates["cars"])),country,))
+                conn.commit()
+                conn.close()
+
+            if int(medicine)>=int(rates["medicine"]):
+                conn,c = DatabaseFunctions.connect()
+                DatabaseFunctions.increase_medicine(country, rates["medicine"])
+                medicine = DatabaseFunctions.get_production_medicine(country)
+                c.execute("UPDATE Production SET medicine = ? WHERE country = ?", (str(int(medicine)-int(rates["medicine"])),country,))
+                conn.commit()
+                conn.close()
+            time.sleep(0.3)
+
+
+
+
+
+    def start_needs(country):
+        day=0
+        while True:
+            food = int(DatabaseFunctions.food(country))
+            medicine = int(DatabaseFunctions.medicine(country))
+            cars = int(DatabaseFunctions.cars(country))
+            clothing = int(DatabaseFunctions.clothing(country))
+            shelter = int(DatabaseFunctions.shelter(country))
+            shelter_threshold = int(DatabaseFunctions.shelter_threshold(country))
+            food_threshold = int(DatabaseFunctions.food_threshold(country))
+            shelter_being_used = 0
+            shelter_being_used = round(shelter/shelter_threshold)
+            food_being_used = 0
+            food_being_used = round(food/food_threshold)
+            money = int(DatabaseFunctions.money(country))
+            population = int(DatabaseFunctions.population(country))
+            rate = [random.randint(5,20),1]
+            people_lost = 0
+            print("Day " + str(day) + " IRL Time: " + str(datetime.now()) + " Running Operation for Country " + str(country).replace("_", " "))
+            day+=1
+            if food>=200:
+                people_born = round(food_being_used/rate[0])
+                food_used = round(food_being_used/rate[1])
+                DatabaseFunctions.increase_population(country, people_born)
+                DatabaseFunctions.decrease_food(country, food_used)
+            else:
+                people_lost = round(population/60)
+                DatabaseFunctions.decrease_population(country, people_lost)
+
+            if shelter>=1:
+                if people_lost == 0:
+                    DatabaseFunctions.decrease_shelter(country, round(shelter_being_used/5))
+                    shelter-shelter_being_used/10
+                    DatabaseFunctions.give_money(country,round(shelter_being_used/60)*5000)
+                else:
+                    DatabaseFunctions.increase_shelter(country, round(population/40))
+                    DatabaseFunctions.remove_money(country,round(int(DatabaseFunctions.money(country))/120))
+            if shelter<=-1:
+                increase_by = int(str(shelter).replace("-", ""))
+                DatabaseFunctions.increase_shelter(country, increase_by)
+            if medicine<=100:
+                DatabaseFunctions.decrease_population(country, round(population/240))
+                DatabaseFunctions.decrease_medicine(country, round(medicine/60))
+            else:
+                DatabaseFunctions.increase_population(country, round(medicine/100000))
+                DatabaseFunctions.decrease_medicine(country, round(medicine/60))
+
+            if clothing<=100:
+                DatabaseFunctions.decrease_population(country, round(population/480))
+                DatabaseFunctions.decrease_clothing(country, round(medicine/40))
+            else:
+                DatabaseFunctions.decrease_clothing(country, round(medicine/40))
+
+            if True==False:
+                DatabaseFunctions.decrease_population(country, round(population/200))
+                DatabaseFunctions.decrease_cars(country, round(cars/120))
+            else:
+                pass#DatabaseFunctions.decrease_cars(country, round(cars/120))
+
+
+
+
+            time.sleep(60)
+
+
+
+conn,c = DatabaseFunctions.connect()
+for term in c.execute("SELECT * FROM Needs").fetchall():
+    country = term[0]
+    threading.Thread(target=DatabaseFunctions.start_needs, args=(country,)).start()
+    threading.Thread(target=DatabaseFunctions.start_producing_needs, args=(country,)).start()
+conn.close()
 
 
 
@@ -374,7 +787,7 @@ async def ally(ctx, countryally:str):
             country = str(role)
     for country_ in countries:
         if country_.lower() == country.lower():
-            await ctx.channel.send(str(DatabaseFunctions.ally(countryally, country_)))
+            await ctx.channel.send(stitemnamer(DatabaseFunctions.ally(countryally, country_)))
 
 @wap.command()
 async def allystat(ctx):
@@ -424,13 +837,11 @@ async def addbudget(ctx, amount:str):
         if str(role) in countries:
             country = str(role)
     if "-" not in str(amount):
-        if DatabaseFunctions.money(country)>=amount:
+        if int(DatabaseFunctions.money(country))>=int(amount):
             DatabaseFunctions.add_budget(country, int(amount))
             DatabaseFunctions.remove_money(country, int(amount))
             budget =  ('{:,}'.format(int(DatabaseFunctions.budget(str(country)))))
             await ctx.channel.send("New Budget: " + budget)
-        else:
-            await ctx.channel.send("your trash noob")
 
 @wap.command()
 async def removebudget(ctx, amount:str):
@@ -470,8 +881,9 @@ async def peace(ctx, countrypeace:str):
 async def enmity(ctx, countryenmity:str):
     global countries
     for role in ctx.author.roles:
-        if str(role) in countries:
-            country = str(role)
+        if str(role) in countries:        DatabaseFunctions.remove_money(country, str(amount))
+        DatabaseFunctions.give_money(countrygive, str(amount))
+        country = str(role)
     for country_ in countries:
         if country_.lower() == countryenmity.lower():
             await ctx.channel.send(str(DatabaseFunctions.enmity(country, countryenmity)))
@@ -479,7 +891,6 @@ async def enmity(ctx, countryenmity:str):
 @wap.command()
 async def shop(ctx):
     await ctx.channel.send(Messages.shop)
-
 @wap.command()
 async def buy(ctx, product:str, amount:str):
     global countries
@@ -500,6 +911,256 @@ async def inventory(ctx):
             country = str(role)
     inventory = str(DatabaseFunctions.get_inventory(country)).replace("{", "").replace("}", "").replace(",", "\n").replace("'", "")
     await ctx.channel.send("```" + str(inventory) + "```")
+
+@wap.command()
+async def donate(ctx, countrygive:str, amount:int):
+    if "-" not in str(amount):
+        global countries
+        for role in ctx.author.roles:
+            if str(role) in countries:
+                country = str(role)
+        if int(DatabaseFunctions.money(country))>=int(amount):
+            DatabaseFunctions.remove_money(country, str(amount))
+            DatabaseFunctions.give_money(countrygive, str(amount))
+            await ctx.channel.send("Gave $" + str(amount) + " to " + str(countrygive))
+
+@wap.command()
+async def population(ctx):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+    await ctx.channel.send(country + " Population: " + str(DatabaseFunctions.population(country)))
+
+@wap.command()
+async def food(ctx):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+    await ctx.channel.send(country + " Food: " + str(DatabaseFunctions.food(country)))
+
+@wap.command()
+async def shelter(ctx):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+    await ctx.channel.send(country + " Shelter: " + str(DatabaseFunctions.shelter(country)))
+
+@wap.command()
+async def stats(ctx):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+    money = DatabaseFunctions.money(country)
+    population = DatabaseFunctions.population(country)
+    budget = DatabaseFunctions.budget(country)
+    food = DatabaseFunctions.food(country)
+    shelter = DatabaseFunctions.shelter(country)
+    clothing = DatabaseFunctions.clothing(country)
+    cars = DatabaseFunctions.cars(country)
+    medicine = DatabaseFunctions.medicine(country)
+
+    money = ('{:,}'.format(int(money)))
+    population = ('{:,}'.format(int(population)))
+    budget = ('{:,}'.format(int(budget)))
+    food = ('{:,}'.format(int(food)))
+    shelter = ('{:,}'.format(int(shelter)))
+    cars = ('{:,}'.format(int(cars)))
+    clothing = ('{:,}'.format(int(clothing)))
+    medicine = ('{:,}'.format(int(medicine)))
+
+    message = f"""```ini
+{country}:
+    [Money]      : ${str(money)}
+    [Population] : {str(population)}
+    [Budget]     : ${str(budget)}
+    [Food]       : {str(food)}
+    [Shelter]    : {str(shelter)}
+    [Cars]       : {str(cars)}
+    [Clothing]   : {str(clothing)}
+    [Medicine]   : {str(medicine)}
+```"""
+    await ctx.channel.send(message)
+
+@wap.command()
+async def store(ctx):
+    await ctx.channel.send(Messages.store)
+
+@wap.command()
+async def purchase(ctx, item:str, amount:int):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+
+    money = DatabaseFunctions.money(country)
+    food=40
+    shelter=5000
+    clothing=24
+    cars=18000
+    medicine=12
+
+    if item.lower() == "food":
+        cost = food*amount
+    if item.lower() == "shelter":
+        cost = shelter*amount
+    if item.lower() == "clothing":
+        cost = clothing*amount
+    if item.lower() == "cars":
+        cost = cars*amount
+    if item.lower() == "medicine":
+        cost = medicine*amount
+
+    if int(money)>=int(cost):
+        DatabaseFunctions.remove_money(country, cost)
+        if item.lower() == "food":
+            DatabaseFunctions.increase_food(country, amount)
+            tax = round(cost*0.8)
+            DatabaseFunctions.give_money("Brazil", tax)
+            await ctx.channel.send("Bought " + str(amount) + " food for " + str(cost) + ".")
+
+        if item.lower() == "shelter":
+            DatabaseFunctions.increase_shelter(country, amount)
+            await ctx.channel.send("Bought " + str(amount) + " shelter for " + str(cost) + ".")
+
+        if item.lower() == "clothing":
+            DatabaseFunctions.increase_clothing(country, amount)
+            await ctx.channel.send("Bought " + str(amount) + " clothing for " + str(cost) + ".")
+
+        if item.lower() == "cars":
+            DatabaseFunctions.increase_cars(country, amount)
+            await ctx.channel.send("Bought " + str(amount) + " cars for " + str(cost) + ".")
+
+        if item.lower() == "medicine":
+            DatabaseFunctions.increase_medicine(country, amount)
+            await ctx.channel.send("Bought " + str(amount) + " medicine for " + str(cost) + ".")
+
+@wap.command()
+async def sellfood(ctx, amount:int):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+
+    food = DatabaseFunctions.food(country)
+    if int(food)>=amount:
+        gained = amount*35
+        DatabaseFunctions.decrease_food(country, amount)
+        DatabaseFunctions.give_money(country, gained)
+        await ctx.channel.send("Sold " + str(amount) + " food for " + str(gained))
+
+@wap.command()
+async def evaluate(ctx, equation:str):
+    output = eval(equation)
+    output = ('{:,}'.format(output))
+    await ctx.channel.send(str(output))
+
+@wap.command()
+async def production(ctx):
+    await ctx.channel.send(Messages.production)
+
+@wap.command()
+async def produce(ctx, item:str, amount:str):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+
+    produce_dict_price = {
+"food": "32",
+"shelter": "4000",
+"clothing": "20",
+"cars": "15000",
+"medicine": "10"
+}
+
+    money = int(DatabaseFunctions.money(country))
+    product_price = int(produce_dict_price[item.lower()])
+    money_needed = int(product_price*int(amount))
+    if money>=money_needed:
+        DatabaseFunctions.remove_money(country, money_needed)
+        DatabaseFunctions.start_production(country, item, amount)
+        money_needed = ('{:,}'.format(int(money_needed)))
+
+        await ctx.channel.send("Started production of " + str(item) + " in amounts of " + str(amount) + ". Costed $" + str(money_needed) + ".")
+
+@wap.command()
+async def producestats(ctx):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+
+    food = DatabaseFunctions.get_production_food(country)
+    shelter = DatabaseFunctions.get_production_shelter(country)
+    clothing = DatabaseFunctions.get_production_clothing(country)
+    cars = DatabaseFunctions.get_production_cars(country)
+    medicine = DatabaseFunctions.get_production_medicine(country)
+
+    medicine = ('{:,}'.format(int(medicine)))
+    cars = ('{:,}'.format(int(cars)))
+    clothing = ('{:,}'.format(int(clothing)))
+    shelter = ('{:,}'.format(int(shelter)))
+    food = ('{:,}'.format(int(food)))
+
+    message = f"""```ini
+[Food]     : {str(food)}
+[Shelter]  : {str(shelter)}
+[Clothing] : {str(clothing)}
+[Cars]     : {str(cars)}
+[Medicine] : {str(medicine)}
+```"""
+
+    await ctx.channel.send(message)
+
+@wap.command()
+async def sell(ctx, item:str, amount:str):
+    global countries
+    for role in ctx.author.roles:
+        if str(role) in countries:
+            country = str(role)
+
+    prices = {"food": "40", "shelter": "5000", "clothing": "24", "medicine": "12"}
+    cost = "0"
+
+    item = item.lower()
+    itemname = item.lower()
+    if itemname == "food":
+        item = DatabaseFunctions.food(country)
+        if int(item)>=int(amount):
+            cost = int(amount)*int(prices[itemname])
+            DatabaseFunctions.decrease_food(country, amount)
+            DatabaseFunctions.give_money(country, cost)
+
+    if itemname == "shelter":
+        item = DatabaseFunctions.shelter(country)
+        if int(item)>=int(amount):
+            cost = int(amount)*int(prices[itemname])
+            DatabaseFunctions.decrease_shelter(country, amount)
+            DatabaseFunctions.give_money(country, cost)
+
+    if itemname == "clothing":
+        item = DatabaseFunctions.clothing(country)
+        if int(item)>=int(amount):
+            cost = int(amount)*int(prices[itemname])
+            DatabaseFunctions.decrease_clothing(country, amount)
+            DatabaseFunctions.give_money(country, cost)
+
+    if itemname == "medicine":
+        item = DatabaseFunctions.medicine(country)
+        if int(item)>=int(amount):
+            cost = int(amount)*int(prices[itemname])
+            DatabaseFunctions.decrease_medicine(country, amount)
+            DatabaseFunctions.give_money(country, cost)
+
+    cost = ('{:,}'.format(int(cost)))
+    await ctx.channel.send("Sold " + str(amount) + " " + str(itemname) + " for $" + str(cost) + ".")
+
+
+
 
 
 
